@@ -14,3 +14,4 @@ test_rss.xml
 # OS
 .DS_Store
 Thumbs.db
+.vercel

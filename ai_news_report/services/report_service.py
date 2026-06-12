@@ -7,6 +7,8 @@ import os
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
+import requests
+
 from .news_service import NewsArticle, fetch_news
 
 KST = timezone(timedelta(hours=9))
@@ -28,57 +30,37 @@ def _format_time_kst(dt: datetime) -> str:
     return f"{dt.hour:02d}:{dt.minute:02d}:{dt.second:02d}"
 
 
-def _analyze_with_openai(keyword: str, articles: list[NewsArticle]) -> dict[str, Any] | None:
-    api_key = os.getenv("OPENAI_API_KEY")
+def _analyze_with_gemini(keyword: str, articles: list[NewsArticle]) -> dict[str, Any] | None:
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if not api_key or not articles:
         return None
 
+    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
+    news_text = "\n".join(
+        f"{i}. [{a.source}] {a.title}\n   요약: {(a.summary or a.title)[:250]}\n   URL: {a.link}"
+        for i, a in enumerate(articles[:12], 1)
+    )
+
+    prompt = f"""당신은 뉴스 분석 전문가입니다. JSON만 출력하세요.
+
+키워드: {keyword}
+뉴스 목록:
+{news_text}
+
+형식:
+{{"executive_summary":"핵심요약 3~4문장","top_issues":[{{"rank":1,"title":"","key_content":"","why_important":"","source":"","link":""}}]}}
+top_issues 5개."""
+
     try:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=api_key)
-        news_text = "\n".join(
-            f"{i}. [{a.source}] {a.title}\n   요약: {(a.summary or a.title)[:250]}\n   URL: {a.link}"
-            for i, a in enumerate(articles[:12], 1)
-        )
-
-        response = client.chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-            response_format={"type": "json_object"},
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "당신은 뉴스 분석 전문가입니다. "
-                        "주어진 뉴스를 분석하여 JSON으로 보고서를 작성하세요.\n"
-                        "반드시 아래 JSON 형식을 따르세요:\n"
-                        "{\n"
-                        '  "executive_summary": "핵심요약 3~4문장",\n'
-                        '  "top_issues": [\n'
-                        "    {\n"
-                        '      "rank": 1,\n'
-                        '      "title": "이슈 제목",\n'
-                        '      "key_content": "핵심내용 2~3문장",\n'
-                        '      "why_important": "왜 중요한지 1~2문장",\n'
-                        '      "source": "언론사명",\n'
-                        '      "link": "기사 URL"\n'
-                        "    }\n"
-                        "  ]\n"
-                        "}\n"
-                        "top_issues는 정확히 5개만 작성하세요. "
-                        "executive_summary는 보고서 맨 앞에 표시될 핵심요약입니다."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": f"키워드: {keyword}\n\n뉴스 목록:\n{news_text}",
-                },
-            ],
-            temperature=0.4,
-            max_tokens=2000,
-        )
-
-        data = json.loads(response.choices[0].message.content)
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.4, "responseMimeType": "application/json"},
+        }
+        response = requests.post(url, json=payload, timeout=60)
+        response.raise_for_status()
+        raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+        data = json.loads(raw)
         issues = data.get("top_issues", [])[:TOP_N]
         for i, issue in enumerate(issues, 1):
             issue["rank"] = i
@@ -242,7 +224,7 @@ def generate_report(keyword: str) -> dict:
     if not articles:
         raise ValueError(f"'{keyword}' 관련 최근 7일 이내 뉴스를 찾지 못했습니다.")
 
-    report_data = _analyze_with_openai(keyword, articles) or _build_fallback_report(keyword, articles)
+    report_data = _analyze_with_gemini(keyword, articles) or _build_fallback_report(keyword, articles)
 
     html = _build_email_html(keyword, created_at, len(articles), report_data, articles)
 

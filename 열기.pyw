@@ -1,19 +1,19 @@
-"""AI 뉴스 레포트 — 로컬 서버 (뉴스 수집 API 포함)"""
+"""AI 뉴스 레포트 — 로컬 서버 (Gemini API)"""
 from __future__ import annotations
 
 import http.server
 import json
 import os
-import re
 import socketserver
 import sys
 import threading
 import time
 import webbrowser
-from datetime import datetime, timedelta, timezone
-from email.utils import parsedate_to_datetime
-from typing import Optional
-from urllib.parse import parse_qs, quote_plus, unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
+
+DIR = os.path.dirname(os.path.abspath(__file__))
+if DIR not in sys.path:
+    sys.path.insert(0, DIR)
 
 try:
     import feedparser
@@ -24,88 +24,24 @@ except ImportError:
     import feedparser
     import requests
 
+from gemini_report import build_full_report, fetch_news
+
 PORT_START = 8777
 PORT_END = 8785
-DIR = os.path.dirname(os.path.abspath(__file__))
 HTML_NAME = "index.html"
 PORT_FILE = "server_port.txt"
 
 
-def _parse_published(entry: dict) -> Optional[datetime]:
-    for key in ("published_parsed", "updated_parsed"):
-        parsed = entry.get(key)
-        if parsed:
-            try:
-                return datetime(*parsed[:6], tzinfo=timezone.utc)
-            except (TypeError, ValueError):
-                pass
-    for key in ("published", "updated"):
-        raw = entry.get(key)
-        if raw:
-            try:
-                dt = parsedate_to_datetime(raw)
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
-                return dt
-            except (TypeError, ValueError):
-                pass
-    return None
-
-
-def _extract_source(entry: dict) -> str:
-    source = entry.get("source", {})
-    if isinstance(source, dict) and source.get("title"):
-        return source["title"]
-    link = entry.get("link", "")
-    match = re.search(r"https?://(?:www\.)?([^/]+)", link)
-    return match.group(1) if match else "알 수 없음"
-
-
-def _clean_summary(text: str) -> str:
-    text = re.sub(r"<[^>]+>", "", text or "")
-    return re.sub(r"\s+", " ", text).strip()
-
-
-def _format_date(dt: datetime) -> str:
-    kst = dt.astimezone(timezone(timedelta(hours=9)))
-    return f"{kst.year}년 {kst.month:02d}월 {kst.day:02d}일"
-
-
-def fetch_news(keyword: str, days: int = 7, max_articles: int = 15) -> list[dict]:
-    encoded = quote_plus(keyword)
-    url = f"https://news.google.com/rss/search?q={encoded}+when:{days}d&hl=ko&gl=KR&ceid=KR:ko"
-
-    feed = feedparser.parse(url)
-    if feed.bozo and not feed.entries:
-        response = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
-        response.raise_for_status()
-        feed = feedparser.parse(response.content)
-
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-    articles: list[dict] = []
-
-    for entry in feed.entries:
-        published = _parse_published(entry)
-        if published and published < cutoff:
+def load_env() -> None:
+    env_path = os.path.join(DIR, ".env")
+    if not os.path.isfile(env_path):
+        return
+    for line in open(env_path, encoding="utf-8"):
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
             continue
-        title = (entry.get("title") or "").strip()
-        if not title:
-            continue
-        link = entry.get("link", "")
-        summary = _clean_summary(entry.get("summary") or entry.get("description") or "")
-        pub = published or datetime.now(timezone.utc)
-        articles.append({
-            "title": title,
-            "link": link,
-            "desc": summary,
-            "source": _extract_source(entry),
-            "published": _format_date(pub),
-        })
-        if len(articles) >= max_articles:
-            break
-
-    articles.sort(key=lambda a: a.get("published", ""), reverse=True)
-    return articles
+        key, _, val = line.partition("=")
+        os.environ.setdefault(key.strip(), val.strip())
 
 
 class NewsHandler(http.server.BaseHTTPRequestHandler):
@@ -114,7 +50,16 @@ class NewsHandler(http.server.BaseHTTPRequestHandler):
 
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+
+    def _json_response(self, status: int, data: dict):
+        body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self._cors()
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_OPTIONS(self):
         self.send_response(200)
@@ -125,17 +70,26 @@ class NewsHandler(http.server.BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = unquote(parsed.path).rstrip("/") or "/"
 
-        if path == "/api/news":
-            self._handle_news(parsed)
+        if path == "/api/ping":
+            self._json_response(200, {"ok": True})
             return
 
-        if path == "/api/ping":
-            body = b'{"ok":true}'
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self._cors()
-            self.end_headers()
-            self.wfile.write(body)
+        if path == "/api/port":
+            port = int(os.environ.get("SERVER_PORT", PORT_START))
+            self._json_response(200, {"port": port})
+            return
+
+        if path == "/api/news":
+            keyword = parse_qs(parsed.query).get("keyword", [""])[0].strip()
+            try:
+                if not keyword:
+                    raise ValueError("키워드를 입력해 주세요.")
+                articles = fetch_news(keyword)
+                if not articles:
+                    raise ValueError(f"'{keyword}' 관련 뉴스를 찾지 못했습니다.")
+                self._json_response(200, {"success": True, "articles": articles})
+            except Exception as e:
+                self._json_response(400, {"success": False, "error": str(e)})
             return
 
         if path == "/favicon.ico":
@@ -148,57 +102,46 @@ class NewsHandler(http.server.BaseHTTPRequestHandler):
             target = os.path.join(DIR, HTML_NAME)
             if not os.path.isfile(target):
                 target = os.path.join(DIR, "AI뉴스레포트.html")
-            self._serve_file(target, "text/html; charset=utf-8")
+            self._serve_file(target)
             return
 
-        self._send_help_page(path)
+        self._json_response(404, {"success": False, "error": f"경로를 찾을 수 없습니다: {path}"})
 
-    def _handle_news(self, parsed):
-        keyword = parse_qs(parsed.query).get("keyword", [""])[0].strip()
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        path = unquote(parsed.path).rstrip("/") or "/"
+
+        if path != "/api/generate":
+            self._json_response(404, {"success": False, "error": "POST /api/generate 만 지원합니다."})
+            return
+
+        length = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(length).decode("utf-8") if length else "{}"
+        try:
+            body = json.loads(raw)
+        except json.JSONDecodeError:
+            self._json_response(400, {"success": False, "error": "잘못된 JSON 요청입니다."})
+            return
+
+        keyword = (body.get("keyword") or "").strip()
         try:
             if not keyword:
                 raise ValueError("키워드를 입력해 주세요.")
-            articles = fetch_news(keyword)
-            if not articles:
-                raise ValueError(f"'{keyword}' 관련 최근 7일 뉴스를 찾지 못했습니다.")
-            body = json.dumps({"success": True, "articles": articles}, ensure_ascii=False)
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self._cors()
-            self.end_headers()
-            self.wfile.write(body.encode("utf-8"))
+            result = build_full_report(keyword)
+            self._json_response(200, result)
         except Exception as e:
-            body = json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
-            self.send_response(400)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self._cors()
-            self.end_headers()
-            self.wfile.write(body.encode("utf-8"))
+            self._json_response(400, {"success": False, "error": str(e)})
 
-    def _serve_file(self, path: str, content_type: str):
+    def _serve_file(self, path: str):
         if not os.path.isfile(path):
-            self.send_error(404)
+            self._json_response(404, {"success": False, "error": "HTML 파일 없음"})
             return
         with open(path, "rb") as f:
             data = f.read()
         self.send_response(200)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(data)))
-        self._cors()
-        self.end_headers()
-        self.wfile.write(data)
-
-    def _send_help_page(self, path: str):
-        body = f"""<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
-        <title>AI 뉴스 레포트</title></head><body style="font-family:Malgun Gothic;padding:40px">
-        <h2>페이지를 찾을 수 없습니다 (404)</h2>
-        <p>요청 경로: <code>{path}</code></p>
-        <p><a href="/">← AI 뉴스 레포트 홈으로 이동</a></p>
-        </body></html>"""
-        data = body.encode("utf-8")
-        self.send_response(404)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
+        self._cors()
         self.end_headers()
         self.wfile.write(data)
 
@@ -209,6 +152,7 @@ class ReusableServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 
 
 def main():
+    load_env()
     os.chdir(DIR)
 
     httpd = None
@@ -222,8 +166,9 @@ def main():
             continue
 
     if not httpd or port is None:
-        raise SystemExit("사용 가능한 포트를 찾지 못했습니다. 다른 프로그램을 종료 후 다시 시도하세요.")
+        raise SystemExit("사용 가능한 포트를 찾지 못했습니다.")
 
+    os.environ["SERVER_PORT"] = str(port)
     with open(os.path.join(DIR, PORT_FILE), "w", encoding="utf-8") as f:
         f.write(str(port))
 

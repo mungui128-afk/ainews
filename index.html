@@ -601,11 +601,9 @@
       };
     }
 
-    function getApiUrl(keyword) {
-      const base = location.protocol.startsWith('http')
-        ? location.origin
-        : `http://127.0.0.1:${window.SERVER_PORT || 8777}`;
-      return `${base}/api/news?keyword=${encodeURIComponent(keyword)}`;
+    function getBaseUrl() {
+      if (location.protocol.startsWith('http')) return location.origin;
+      return `http://127.0.0.1:${window.SERVER_PORT || 8777}`;
     }
 
     async function detectServerPort() {
@@ -618,55 +616,49 @@
       }
     }
 
-    async function fetchNews(keyword) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 30000);
+    async function parseJsonResponse(res) {
+      const text = await res.text();
       try {
-        const res = await fetch(getApiUrl(keyword), { signal: controller.signal });
+        return JSON.parse(text);
+      } catch {
+        if (text.trim().startsWith('<') || text.includes('The page')) {
+          throw new Error('API 서버에 연결되지 않았습니다. 열기.pyw 실행 또는 Vercel 배포를 확인하세요.');
+        }
+        throw new Error('서버 응답 형식 오류: ' + text.slice(0, 80));
+      }
+    }
+
+    async function generateReport(keyword) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 90000);
+      try {
+        const res = await fetch(`${getBaseUrl()}/api/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keyword }),
+          signal: controller.signal,
+        });
         clearTimeout(timer);
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error || '뉴스 수집 실패');
-        return data.articles;
+        const data = await parseJsonResponse(res);
+        if (!data.success) throw new Error(data.error || '보고서 생성 실패');
+        return data;
       } catch (err) {
         clearTimeout(timer);
         if (location.protocol === 'file:') {
           throw new Error('열기.pyw 를 더블클릭해서 실행하세요.');
         }
-        throw new Error((err.message || '뉴스 수집 실패') + ' — 열기.pyw 를 다시 실행해 주세요.');
+        throw new Error(err.message || '보고서 생성 실패');
       }
     }
 
-    function buildReport(keyword, articles) {
-      const top5 = articles.slice(0, 5);
-      const preview = top5.slice(0, 3)
-        .map(a => `「${a.title.split(' - ')[0].slice(0, 25)}」`)
-        .join(', ');
-      const executive_summary =
-        `최근 7일간 '${keyword}' 관련 뉴스 ${articles.length}건을 분석한 결과, ` +
-        `${preview} 등이 핵심 이슈로 부상했습니다. ` +
-        `아래 TOP ${top5.length} 이슈는 보도 빈도·관련성 기준으로 선정했으며, ` +
-        `'${keyword}' 분야의 최신 동향 파악에 참고하시기 바랍니다.`;
-      const top_issues = top5.map((a, i) => ({
-        rank: i + 1,
-        title: a.title,
-        key_content: (a.desc || a.title).slice(0, 300) + ((a.desc || a.title).length > 300 ? '...' : ''),
-        why_important:
-          `'${keyword}' 분야의 최근 흐름을 이해하는 데 핵심적인 이슈입니다. ` +
-          `${a.source} 등 주요 매체에서 보도되어 업무·의사결정 시 참고 가치가 높습니다.`,
-        source: a.source,
-        link: a.link,
-      }));
-      return { executive_summary, top_issues };
-    }
-
-    function buildPlainText(keyword, created, report, articles) {
+    function buildPlainText(data) {
       const lines = [
-        `AI 뉴스 레포트 - ${keyword}`,
-        `생성일: ${created.date}`,
-        `생성시간: ${created.time} (KST)`,
-        '', '=== 핵심요약 ===', report.executive_summary, '', '=== 주요이슈 TOP 5 ===',
+        `AI 뉴스 레포트 - ${data.keyword}`,
+        `생성일: ${data.created_date}`,
+        `생성시간: ${data.created_time} (KST)`,
+        '', '=== 핵심요약 ===', data.executive_summary, '', '=== 주요이슈 TOP 5 ===',
       ];
-      report.top_issues.forEach(issue => {
+      data.top_issues.forEach(issue => {
         lines.push(
           `TOP ${issue.rank}. ${issue.title}`,
           `  · 핵심내용: ${issue.key_content}`,
@@ -675,7 +667,7 @@
         );
       });
       lines.push('=== 참고출처 ===');
-      articles.forEach((a, i) => {
+      data.articles.forEach((a, i) => {
         lines.push(`${i + 1}. [${a.source}] ${a.title}`, `   ${a.link}`);
       });
       return lines.join('\n');
@@ -716,14 +708,14 @@
       });
     }
 
-    function renderReport(keyword, created, report, articles) {
-      document.getElementById('reportKeyword').textContent = keyword;
-      document.getElementById('reportDate').textContent = created.date;
-      document.getElementById('reportTime').textContent = created.time + ' (KST)';
-      document.getElementById('reportCount').textContent = articles.length + '건';
-      document.getElementById('executiveSummary').textContent = report.executive_summary;
+    function renderReport(data) {
+      document.getElementById('reportKeyword').textContent = data.keyword;
+      document.getElementById('reportDate').textContent = data.created_date;
+      document.getElementById('reportTime').textContent = data.created_time + ' (KST)';
+      document.getElementById('reportCount').textContent = data.article_count + '건';
+      document.getElementById('executiveSummary').textContent = data.executive_summary;
 
-      document.getElementById('topIssues').innerHTML = report.top_issues.map(issue => `
+      document.getElementById('topIssues').innerHTML = data.top_issues.map(issue => `
         <div class="issue-row">
           <span class="issue-rank">TOP ${issue.rank}</span>
           <p class="issue-title">${issue.title}</p>
@@ -742,7 +734,7 @@
         </div>
       `).join('');
 
-      document.getElementById('sourcesList').innerHTML = articles.map((a, i) => `
+      document.getElementById('sourcesList').innerHTML = data.articles.map((a, i) => `
         <li>
           <a href="${a.link}" target="_blank" rel="noopener">${i + 1}. [${a.source}] ${a.title}</a>
           <div class="source-meta">${a.published}</div>
@@ -759,13 +751,12 @@
       if (!keyword) return;
       submitBtn.disabled = true;
       reportSection.classList.remove('show');
-      showStatus('loading', '<div class="spinner"></div><span>뉴스 수집 중… (15~20초 소요)</span>');
+      showStatus('loading', '<div class="spinner"></div><span>Gemini로 뉴스 분석 중… (30~60초)</span>');
       try {
-        const articles = await fetchNews(keyword);
-        const report = buildReport(keyword, articles);
-        const created = formatKST(nowKST());
-        const plainText = buildPlainText(keyword, created, report, articles);
-        renderReport(keyword, created, report, articles);
+        const data = await generateReport(keyword);
+        const plainText = buildPlainText(data);
+        renderReport(data);
+        const created = { file: `${data.created_date} ${data.created_time}` };
         const emailResult = await sendEmail(keyword, plainText, created);
         showStatus(
           emailResult.sent ? 'success' : 'warning',
