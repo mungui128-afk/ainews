@@ -1,0 +1,16 @@
+# 환경 변수 (비밀번호·API 키)
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyw.bak
+
+# 런타임
+server_port.txt
+test_rss.xml
+
+# OS
+.DS_Store
+Thumbs.db

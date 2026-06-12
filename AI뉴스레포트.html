@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 뉴스 레포트</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #111111;
+      --on-primary: #ffffff;
+      --canvas: #ffffff;
+      --soft-cloud: #f5f5f5;
+      --charcoal: #39393b;
+      --mute: #707072;
+      --stone: #9e9ea0;
+      --hairline: #cacacb;
+      --hairline-soft: #e5e5e5;
+      --success: #007d48;
+      --success-bright: #1eaa52;
+      --sale: #d30005;
+      --info: #1151ff;
+      --accent-teal: #0a7281;
+      --rounded-none: 0;
+      --rounded-md: 24px;
+      --rounded-lg: 30px;
+      --rounded-full: 9999px;
+      --spacing-xs: 4px;
+      --spacing-sm: 8px;
+      --spacing-md: 12px;
+      --spacing-lg: 18px;
+      --spacing-xl: 24px;
+      --spacing-section: 48px;
+      --max-width: 900px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', 'Helvetica Now Text', 'Malgun Gothic', sans-serif;
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 1.5;
+      color: var(--ink);
+      background: var(--canvas);
+      min-height: 100vh;
+    }
+
+    /* utility-bar */
+    .utility-bar {
+      background: var(--soft-cloud);
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.5;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      letter-spacing: 0.02em;
+    }
+
+    /* primary-nav */
+    .primary-nav {
+      background: var(--canvas);
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-bottom: 1px solid var(--hairline-soft);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .nav-brand {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    /* campaign-hero */
+    .campaign-hero {
+      background: var(--ink);
+      color: var(--on-primary);
+      padding: var(--spacing-section) var(--spacing-xl);
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    .campaign-hero-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .display-campaign {
+      font-family: 'Bebas Neue', 'Helvetica Now Display', sans-serif;
+      font-size: clamp(48px, 10vw, 96px);
+      font-weight: 500;
+      line-height: 0.9;
+      letter-spacing: 0;
+      text-transform: uppercase;
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .hero-sub {
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 1.5;
+      color: var(--stone);
+      max-width: 480px;
+    }
+
+    /* layout */
+    .main {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--spacing-section) var(--spacing-xl) 80px;
+    }
+
+    .section-title {
+      font-size: 32px;
+      font-weight: 500;
+      line-height: 1.2;
+      margin-bottom: var(--spacing-xl);
+    }
+
+    /* search */
+    .search-block {
+      margin-bottom: var(--spacing-section);
+    }
+
+    .search-row {
+      display: flex;
+      gap: var(--spacing-sm);
+      margin-bottom: var(--spacing-xl);
+    }
+
+    .search-pill {
+      flex: 1;
+      background: var(--soft-cloud);
+      color: var(--ink);
+      border: none;
+      border-radius: var(--rounded-md);
+      padding: var(--spacing-sm) var(--spacing-lg);
+      height: 48px;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 400;
+      outline: none;
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+
+    .search-pill::placeholder { color: var(--mute); }
+
+    .search-pill:focus {
+      background: var(--canvas);
+      box-shadow: 0 0 0 2px var(--ink), 0 0 0 6px var(--soft-cloud);
+    }
+
+    /* button-primary */
+    .button-primary {
+      background: var(--ink);
+      color: var(--on-primary);
+      border: none;
+      border-radius: var(--rounded-lg);
+      padding: 16px 32px;
+      height: 48px;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 500;
+      line-height: 1.5;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: transform 0.1s, opacity 0.1s;
+    }
+
+    .button-primary:hover:not(:disabled) { opacity: 0.85; }
+
+    .button-primary:active:not(:disabled) {
+      transform: scale(0.98);
+      opacity: 0.7;
+    }
+
+    .button-primary:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* filter-chip */
+    .chips-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--mute);
+      margin-bottom: var(--spacing-md);
+    }
+
+    .filter-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--spacing-sm);
+    }
+
+    .filter-chip {
+      background: var(--canvas);
+      color: var(--ink);
+      border: 1px solid var(--hairline);
+      border-radius: var(--rounded-lg);
+      padding: 8px 16px;
+      height: 40px;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+
+    .filter-chip:hover {
+      border-color: var(--ink);
+    }
+
+    .filter-chip.active {
+      background: var(--ink);
+      color: var(--on-primary);
+      border-color: var(--ink);
+    }
+
+    .info-notice {
+      margin-top: var(--spacing-xl);
+      padding: var(--spacing-md) var(--spacing-lg);
+      background: var(--soft-cloud);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--charcoal);
+      line-height: 1.5;
+    }
+
+    /* status */
+    .status-bar {
+      display: none;
+      padding: var(--spacing-md) var(--spacing-lg);
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: var(--spacing-xl);
+      align-items: center;
+      gap: var(--spacing-md);
+      border: 1px solid var(--hairline);
+    }
+
+    .status-bar.show { display: flex; }
+    .status-bar.loading { background: var(--soft-cloud); color: var(--ink); }
+    .status-bar.success { background: var(--canvas); color: var(--success); border-color: var(--success); }
+    .status-bar.warning { background: var(--canvas); color: var(--charcoal); border-color: var(--hairline); }
+    .status-bar.error { background: var(--canvas); color: var(--sale); border-color: var(--sale); }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid var(--hairline);
+      border-top-color: var(--ink);
+      border-radius: var(--rounded-full);
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* report */
+    #reportSection { display: none; }
+    #reportSection.show { display: block; }
+
+    .report-card {
+      background: var(--canvas);
+      border-top: 1px solid var(--hairline);
+    }
+
+    .report-hero {
+      background: var(--ink);
+      color: var(--on-primary);
+      padding: var(--spacing-xl) var(--spacing-xl) var(--spacing-section);
+    }
+
+    .report-hero h2 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 48px;
+      font-weight: 500;
+      line-height: 0.9;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    .keyword-badge {
+      display: inline-block;
+      margin-top: var(--spacing-sm);
+      background: var(--canvas);
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 500;
+      padding: 4px 12px;
+      border-radius: var(--rounded-lg);
+    }
+
+    .report-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: var(--spacing-sm);
+      padding: var(--spacing-xl);
+      background: var(--soft-cloud);
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .meta-item label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--mute);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .meta-item span {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--ink);
+    }
+
+    /* summary */
+    .summary-block {
+      padding: var(--spacing-xl);
+      background: var(--soft-cloud);
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .summary-block h3 {
+      font-size: 24px;
+      font-weight: 500;
+      line-height: 1.2;
+      margin-bottom: var(--spacing-md);
+    }
+
+    .summary-block p {
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 1.5;
+      color: var(--charcoal);
+    }
+
+    /* issues — faq-row style */
+    .issues-block {
+      padding: var(--spacing-xl) 0;
+    }
+
+    .issues-block > h3 {
+      font-size: 24px;
+      font-weight: 500;
+      line-height: 1.2;
+      padding: 0 var(--spacing-xl) var(--spacing-xl);
+    }
+
+    .issue-row {
+      padding: var(--spacing-xl);
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .issue-row:last-child { border-bottom: none; }
+
+    .issue-rank {
+      display: inline-block;
+      background: var(--ink);
+      color: var(--on-primary);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 12px;
+      border-radius: var(--rounded-lg);
+      margin-bottom: var(--spacing-md);
+    }
+
+    .issue-title {
+      font-size: 16px;
+      font-weight: 500;
+      line-height: 1.75;
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .issue-field {
+      margin-bottom: var(--spacing-md);
+    }
+
+    .issue-field:last-child { margin-bottom: 0; }
+
+    .issue-field dt {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--mute);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .issue-field dd {
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 1.5;
+      color: var(--charcoal);
+    }
+
+    .issue-field a {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--ink);
+      text-decoration: underline;
+      line-height: 1.75;
+    }
+
+    /* sources — disclosure rows */
+    .sources-block {
+      border-top: 1px solid var(--hairline);
+      padding: var(--spacing-xl) 0;
+    }
+
+    .sources-block h3 {
+      font-size: 24px;
+      font-weight: 500;
+      line-height: 1.2;
+      padding: 0 var(--spacing-xl) var(--spacing-xl);
+    }
+
+    .sources-list { list-style: none; }
+
+    .sources-list li {
+      padding: var(--spacing-lg) var(--spacing-xl);
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .sources-list a {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--ink);
+      text-decoration: underline;
+      line-height: 1.75;
+    }
+
+    .source-meta {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--mute);
+      margin-top: var(--spacing-xs);
+    }
+
+    /* footer */
+    .site-footer {
+      border-top: 1px solid var(--hairline);
+      padding: var(--spacing-section) var(--spacing-xl);
+      text-align: center;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--mute);
+      line-height: 1.5;
+    }
+
+    @media (max-width: 640px) {
+      .search-row { flex-direction: column; }
+      .button-primary { width: 100%; }
+      .campaign-hero { padding: var(--spacing-xl) var(--spacing-lg); }
+      .main { padding: var(--spacing-xl) var(--spacing-lg) 64px; }
+      .section-title { font-size: 24px; }
+      .report-hero h2 { font-size: 36px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="utility-bar">AI NEWS REPORT · 최근 7일 자동 수집 · 이메일 발송</div>
+
+  <nav class="primary-nav">
+    <span class="nav-brand">AI 뉴스 레포트</span>
+  </nav>
+
+  <header class="campaign-hero">
+    <div class="campaign-hero-inner">
+      <h1 class="display-campaign">AI News<br>Report</h1>
+      <p class="hero-sub">키워드를 입력하면 최근 7일 주요 이슈를 자동 수집하여 보고서를 생성하고 이메일로 발송합니다.</p>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <section class="search-block">
+      <h2 class="section-title">키워드 검색</h2>
+      <form id="reportForm">
+        <div class="search-row">
+          <input type="text" id="keyword" class="search-pill" placeholder="관심 키워드를 입력하세요" autocomplete="off" required />
+          <button type="submit" class="button-primary" id="submitBtn">보고서 생성 · 발송</button>
+        </div>
+        <p class="chips-label">키워드 예시</p>
+        <div class="filter-chips" id="exampleTags"></div>
+        <div class="info-notice">
+          <strong>열기.pyw</strong> 더블클릭 후 보고서 생성 ·
+          <strong id="recipientLabel">mungui128@gmail.com</strong> 발송
+        </div>
+      </form>
+    </section>
+
+    <div id="statusBar" class="status-bar"></div>
+
+    <section id="reportSection">
+      <article class="report-card">
+        <div class="report-hero">
+          <h2>Report</h2>
+          <span class="keyword-badge" id="reportKeyword"></span>
+        </div>
+
+        <div class="report-meta">
+          <div class="meta-item"><label>생성일</label><span id="reportDate">-</span></div>
+          <div class="meta-item"><label>생성시간</label><span id="reportTime">-</span></div>
+          <div class="meta-item"><label>수집 기간</label><span>최근 7일</span></div>
+          <div class="meta-item"><label>수집 건수</label><span id="reportCount">-</span></div>
+        </div>
+
+        <div class="summary-block">
+          <h3>핵심요약</h3>
+          <p id="executiveSummary"></p>
+        </div>
+
+        <div class="issues-block">
+          <h3>주요이슈 TOP 5</h3>
+          <div id="topIssues"></div>
+        </div>
+
+        <div class="sources-block">
+          <h3>참고출처</h3>
+          <ul class="sources-list" id="sourcesList"></ul>
+        </div>
+      </article>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">AI 뉴스 레포트 · DESIGN.md Nike Commerce System</footer>
+
+  <script>
+    const CONFIG = {
+      RECIPIENT: 'mungui128@gmail.com',
+      WEB3FORMS_KEY: '',
+    };
+
+    const EXAMPLE_KEYWORDS = ['인공지능', '반도체', '전기차', '금리', 'K-뷰티', '원화환율'];
+
+    const form = document.getElementById('reportForm');
+    const keywordInput = document.getElementById('keyword');
+    const submitBtn = document.getElementById('submitBtn');
+    const statusBar = document.getElementById('statusBar');
+    const reportSection = document.getElementById('reportSection');
+
+    document.getElementById('recipientLabel').textContent = CONFIG.RECIPIENT;
+    detectServerPort();
+
+    if (location.protocol === 'file:') {
+      showStatus('warning', 'HTML 파일을 직접 열었습니다. <strong>열기.pyw</strong>를 더블클릭해서 사용하세요.');
+    }
+
+    const exampleTags = document.getElementById('exampleTags');
+    EXAMPLE_KEYWORDS.forEach(kw => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'filter-chip';
+      btn.textContent = kw;
+      btn.addEventListener('click', () => {
+        keywordInput.value = kw;
+        document.querySelectorAll('.filter-chip').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        keywordInput.focus();
+      });
+      exampleTags.appendChild(btn);
+    });
+
+    function showStatus(type, html) {
+      statusBar.className = 'status-bar show ' + type;
+      statusBar.innerHTML = html;
+    }
+
+    function nowKST() {
+      return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+    }
+
+    function formatKST(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      const h = String(date.getHours()).padStart(2, '0');
+      const min = String(date.getMinutes()).padStart(2, '0');
+      const s = String(date.getSeconds()).padStart(2, '0');
+      return {
+        date: `${y}년 ${m}월 ${d}일`,
+        time: `${h}:${min}:${s}`,
+        file: `${y}.${m}.${d} ${h}:${min}`,
+      };
+    }
+
+    function getApiUrl(keyword) {
+      const base = location.protocol.startsWith('http')
+        ? location.origin
+        : `http://127.0.0.1:${window.SERVER_PORT || 8777}`;
+      return `${base}/api/news?keyword=${encodeURIComponent(keyword)}`;
+    }
+
+    async function detectServerPort() {
+      if (location.protocol.startsWith('http')) return;
+      for (let p = 8777; p <= 8785; p++) {
+        try {
+          const res = await fetch(`http://127.0.0.1:${p}/api/ping`, { signal: AbortSignal.timeout(800) });
+          if (res.ok) { window.SERVER_PORT = p; return; }
+        } catch { /* next */ }
+      }
+    }
+
+    async function fetchNews(keyword) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 30000);
+      try {
+        const res = await fetch(getApiUrl(keyword), { signal: controller.signal });
+        clearTimeout(timer);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || '뉴스 수집 실패');
+        return data.articles;
+      } catch (err) {
+        clearTimeout(timer);
+        if (location.protocol === 'file:') {
+          throw new Error('열기.pyw 를 더블클릭해서 실행하세요.');
+        }
+        throw new Error((err.message || '뉴스 수집 실패') + ' — 열기.pyw 를 다시 실행해 주세요.');
+      }
+    }
+
+    function buildReport(keyword, articles) {
+      const top5 = articles.slice(0, 5);
+      const preview = top5.slice(0, 3)
+        .map(a => `「${a.title.split(' - ')[0].slice(0, 25)}」`)
+        .join(', ');
+      const executive_summary =
+        `최근 7일간 '${keyword}' 관련 뉴스 ${articles.length}건을 분석한 결과, ` +
+        `${preview} 등이 핵심 이슈로 부상했습니다. ` +
+        `아래 TOP ${top5.length} 이슈는 보도 빈도·관련성 기준으로 선정했으며, ` +
+        `'${keyword}' 분야의 최신 동향 파악에 참고하시기 바랍니다.`;
+      const top_issues = top5.map((a, i) => ({
+        rank: i + 1,
+        title: a.title,
+        key_content: (a.desc || a.title).slice(0, 300) + ((a.desc || a.title).length > 300 ? '...' : ''),
+        why_important:
+          `'${keyword}' 분야의 최근 흐름을 이해하는 데 핵심적인 이슈입니다. ` +
+          `${a.source} 등 주요 매체에서 보도되어 업무·의사결정 시 참고 가치가 높습니다.`,
+        source: a.source,
+        link: a.link,
+      }));
+      return { executive_summary, top_issues };
+    }
+
+    function buildPlainText(keyword, created, report, articles) {
+      const lines = [
+        `AI 뉴스 레포트 - ${keyword}`,
+        `생성일: ${created.date}`,
+        `생성시간: ${created.time} (KST)`,
+        '', '=== 핵심요약 ===', report.executive_summary, '', '=== 주요이슈 TOP 5 ===',
+      ];
+      report.top_issues.forEach(issue => {
+        lines.push(
+          `TOP ${issue.rank}. ${issue.title}`,
+          `  · 핵심내용: ${issue.key_content}`,
+          `  · 왜 중요한지: ${issue.why_important}`,
+          `  · 출처: [${issue.source}] ${issue.link}`, ''
+        );
+      });
+      lines.push('=== 참고출처 ===');
+      articles.forEach((a, i) => {
+        lines.push(`${i + 1}. [${a.source}] ${a.title}`, `   ${a.link}`);
+      });
+      return lines.join('\n');
+    }
+
+    async function sendEmail(keyword, plainText, created) {
+      if (!CONFIG.WEB3FORMS_KEY) {
+        return { sent: false, message: '이메일 Key 미설정 — CONFIG.WEB3FORMS_KEY에 web3forms.com 키를 입력하세요.' };
+      }
+      return new Promise((resolve) => {
+        const iframeName = 'emailFrame_' + Date.now();
+        const iframe = document.createElement('iframe');
+        iframe.name = iframeName;
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        const f = document.createElement('form');
+        f.method = 'POST';
+        f.action = 'https://api.web3forms.com/submit';
+        f.target = iframeName;
+        f.style.display = 'none';
+        Object.entries({
+          access_key: CONFIG.WEB3FORMS_KEY,
+          subject: `[AI 뉴스 레포트] ${keyword} - ${created.file}`,
+          from_name: 'AI 뉴스 레포트',
+          email: CONFIG.RECIPIENT,
+          message: plainText,
+        }).forEach(([name, value]) => {
+          const input = document.createElement('input');
+          input.type = 'hidden'; input.name = name; input.value = value;
+          f.appendChild(input);
+        });
+        document.body.appendChild(f);
+        f.submit();
+        setTimeout(() => {
+          f.remove(); iframe.remove();
+          resolve({ sent: true, message: `보고서가 ${CONFIG.RECIPIENT}(으)로 발송되었습니다.` });
+        }, 2500);
+      });
+    }
+
+    function renderReport(keyword, created, report, articles) {
+      document.getElementById('reportKeyword').textContent = keyword;
+      document.getElementById('reportDate').textContent = created.date;
+      document.getElementById('reportTime').textContent = created.time + ' (KST)';
+      document.getElementById('reportCount').textContent = articles.length + '건';
+      document.getElementById('executiveSummary').textContent = report.executive_summary;
+
+      document.getElementById('topIssues').innerHTML = report.top_issues.map(issue => `
+        <div class="issue-row">
+          <span class="issue-rank">TOP ${issue.rank}</span>
+          <p class="issue-title">${issue.title}</p>
+          <dl class="issue-field">
+            <dt>핵심내용</dt>
+            <dd>${issue.key_content}</dd>
+          </dl>
+          <dl class="issue-field">
+            <dt>왜 중요한지</dt>
+            <dd>${issue.why_important}</dd>
+          </dl>
+          <dl class="issue-field">
+            <dt>출처</dt>
+            <dd><a href="${issue.link}" target="_blank" rel="noopener">[${issue.source}] ${issue.title}</a></dd>
+          </dl>
+        </div>
+      `).join('');
+
+      document.getElementById('sourcesList').innerHTML = articles.map((a, i) => `
+        <li>
+          <a href="${a.link}" target="_blank" rel="noopener">${i + 1}. [${a.source}] ${a.title}</a>
+          <div class="source-meta">${a.published}</div>
+        </li>
+      `).join('');
+
+      reportSection.classList.add('show');
+      reportSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const keyword = keywordInput.value.trim();
+      if (!keyword) return;
+      submitBtn.disabled = true;
+      reportSection.classList.remove('show');
+      showStatus('loading', '<div class="spinner"></div><span>뉴스 수집 중… (15~20초 소요)</span>');
+      try {
+        const articles = await fetchNews(keyword);
+        const report = buildReport(keyword, articles);
+        const created = formatKST(nowKST());
+        const plainText = buildPlainText(keyword, created, report, articles);
+        renderReport(keyword, created, report, articles);
+        const emailResult = await sendEmail(keyword, plainText, created);
+        showStatus(
+          emailResult.sent ? 'success' : 'warning',
+          (emailResult.sent ? '✅ ' : '⚠️ 보고서 생성 완료 · ') + emailResult.message
+        );
+      } catch (err) {
+        showStatus('error', '❌ ' + (err.message || '알 수 없는 오류'));
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
