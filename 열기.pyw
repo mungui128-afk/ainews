@@ -151,9 +151,31 @@ class ReusableServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     daemon_threads = True
 
 
+def stop_stale_servers() -> None:
+    """같은 포트의 구버전 서버(POST 미지원)가 남아 있으면 종료합니다."""
+    if sys.platform != "win32":
+        return
+    import subprocess
+
+    ports = ",".join(str(p) for p in range(PORT_START, PORT_END + 1))
+    script = (
+        f"$ports=@({ports}); "
+        "foreach ($p in $ports) { "
+        "Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue | "
+        "ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue } "
+        "}"
+    )
+    subprocess.run(
+        ["powershell", "-NoProfile", "-Command", script],
+        capture_output=True,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+
+
 def main():
     load_env()
     os.chdir(DIR)
+    stop_stale_servers()
 
     httpd = None
     port = None
